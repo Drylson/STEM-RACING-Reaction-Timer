@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>F1 Reaction Timer</title>
+<title id="pageTitle">F1 Reaction Timer</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -368,7 +368,8 @@
 
 <header>
   <div class="logo-stripe"></div>
-  <div class="logo-text">F1 <span>REACTION</span> TIMER</div>
+  <img id="logoImg" src="" alt="" style="max-height:36px;display:none;border-radius:3px">
+  <div class="logo-text" id="logoText">F1 <span>REACTION</span> TIMER</div>
 </header>
 
 <div id="clickZone" onclick="handleClick()"></div>
@@ -423,11 +424,12 @@
 
 <script>
   // --- State ---
-  let state = 'idle'; // idle | sequence | waiting | done | false_start
+  let state = 'idle';
   let lightTimers = [];
   let goTimer = null;
   let startTime = null;
   let lastReactionMs = null;
+  let siteConfig = null; // loaded from server
 
   const lights = [
     document.getElementById('l1'),
@@ -436,16 +438,66 @@
     document.getElementById('l4'),
     document.getElementById('l5'),
   ];
-  const statusText   = document.getElementById('statusText');
-  const btnStart     = document.getElementById('btnStart');
-  const reactionMs   = document.getElementById('reactionMs');
-  const reactionLabel= document.getElementById('reactionLabel');
+  const statusText      = document.getElementById('statusText');
+  const btnStart        = document.getElementById('btnStart');
+  const reactionMs      = document.getElementById('reactionMs');
+  const reactionLabel   = document.getElementById('reactionLabel');
   const reactionVerdict = document.getElementById('reactionVerdict');
-  const saveSection  = document.getElementById('saveSection');
-  const btnSave      = document.getElementById('btnSave');
-  const saveNote     = document.getElementById('saveNote');
-  const saveOk       = document.getElementById('saveOk');
-  const clickZone    = document.getElementById('clickZone');
+  const saveSection     = document.getElementById('saveSection');
+  const btnSave         = document.getElementById('btnSave');
+  const saveNote        = document.getElementById('saveNote');
+  const saveOk          = document.getElementById('saveOk');
+  const clickZone       = document.getElementById('clickZone');
+
+  // --- Load config from server ---
+  async function loadConfig() {
+    try {
+      const res = await fetch('/api/config');
+      siteConfig = await res.json();
+      applyConfig(siteConfig);
+    } catch(e) { /* use defaults */ }
+  }
+
+  function applyConfig(cfg) {
+    if (!cfg) return;
+    // Accent color
+    if (cfg.accent_color) {
+      document.documentElement.style.setProperty('--red', cfg.accent_color);
+    }
+    // Title
+    if (cfg.site_title) {
+      document.getElementById('pageTitle').textContent = cfg.site_title;
+      // Update header text — split on last space to keep two-tone style
+      const parts = cfg.site_title.split(' ');
+      const last = parts.pop();
+      const logoText = document.getElementById('logoText');
+      logoText.innerHTML = parts.join(' ') + (parts.length ? ' ' : '') + `<span>${last}</span>`;
+    }
+    // Logo
+    if (cfg.logo_url) {
+      const img = document.getElementById('logoImg');
+      img.src = cfg.logo_url;
+      img.style.display = 'block';
+    }
+  }
+
+  function verdict(ms) {
+    const verdicts = siteConfig?.verdicts;
+    if (verdicts && verdicts.length) {
+      const sorted = [...verdicts].sort((a, b) => a.max_ms - b.max_ms);
+      for (const v of sorted) {
+        if (ms < v.max_ms) return { text: v.text, color: v.color };
+      }
+      return { text: sorted[sorted.length-1].text, color: sorted[sorted.length-1].color };
+    }
+    // Fallback defaults
+    if (ms < 150) return { text: '⚡ INCREÍBLE — Nivel F1', color: '#00ff88' };
+    if (ms < 200) return { text: '🏎️ EXCELENTE — Muy rápido', color: '#88ff44' };
+    if (ms < 250) return { text: '✅ BUENO — Por encima de la media', color: '#ccff00' };
+    if (ms < 300) return { text: '🟡 NORMAL — Tiempo típico', color: '#ffcc00' };
+    if (ms < 400) return { text: '🐢 LENTO — Puedes mejorar', color: '#ff8800' };
+    return           { text: '💤 MUY LENTO — ¿Te dormiste?', color: '#ff3300' };
+  }
 
   function resetLights() {
     lights.forEach(l => l.classList.remove('on'));
@@ -456,16 +508,7 @@
     statusText.className = 'status-text' + (cls ? ' ' + cls : '');
   }
 
-  function verdict(ms) {
-    if (ms < 150) return { text: '⚡ INCREÍBLE — Nivel F1', color: '#00ff88' };
-    if (ms < 200) return { text: '🏎️ EXCELENTE — Muy rápido', color: '#88ff44' };
-    if (ms < 250) return { text: '✅ BUENO — Por encima de la media', color: '#ccff00' };
-    if (ms < 300) return { text: '🟡 NORMAL — Tiempo típico', color: '#ffcc00' };
-    if (ms < 400) return { text: '🐢 LENTO — Puedes mejorar', color: '#ff8800' };
-    return           { text: '💤 MUY LENTO — ¿Te dormiste?', color: '#ff3300' };
-  }
 
-  function startSequence() {
     if (state !== 'idle') return;
     state = 'sequence';
 
@@ -641,7 +684,8 @@
     }
   });
 
-  // Load leaderboard on page load
+  // Load config + leaderboard on page load
+  loadConfig();
   loadLeaderboard();
 </script>
 </body>

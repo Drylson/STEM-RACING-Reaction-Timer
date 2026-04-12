@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — F1 Reaction Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0a0a0a;color:#f0f0f0;font-family:'Rajdhani',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .card{background:#111;border:1px solid #222;border-radius:8px;padding:40px 48px;width:360px;display:flex;flex-direction:column;gap:24px;align-items:center}
+  .title{font-family:'Orbitron',monospace;font-size:0.85rem;letter-spacing:0.2em;color:#555}
+  .title span{color:#E8002D}
+  input{width:100%;background:#0a0a0a;border:1px solid #333;color:#f0f0f0;font-family:'Rajdhani',sans-serif;font-size:1.1rem;padding:10px 16px;border-radius:4px;outline:none;transition:border-color .2s}
+  input:focus{border-color:#E8002D}
+  button{width:100%;background:#E8002D;color:#fff;border:none;font-family:'Orbitron',monospace;font-size:0.8rem;letter-spacing:0.15em;padding:13px;border-radius:4px;cursor:pointer;transition:background .15s}
+  button:hover{background:#ff0030}
+  .err{color:#E8002D;font-size:0.85rem;text-align:center;min-height:20px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="title">F1 <span>ADMIN</span></div>
+  <input type="password" id="pwd" placeholder="Contraseña" onkeydown="if(event.key==='Enter')login()">
+  <button onclick="login()">ENTRAR</button>
+  <div class="err" id="err"></div>
+</div>
+<script>
+async function login(){
+  const pwd=document.getElementById('pwd').value;
+  const res=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pwd})});
+  if(res.ok){location.reload();}
+  else{document.getElementById('err').textContent='Contraseña incorrecta';}
+}
+</script>
+</body>
+</html>

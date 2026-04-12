@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Admin — F1 Reaction Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--red:#E8002D;--dark:#0a0a0a;--card:#111;--border:#222;--text:#f0f0f0;--muted:#555}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--dark);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh}
+
+  header{border-bottom:1px solid var(--border);padding:16px 28px;display:flex;align-items:center;justify-content:space-between}
+  .logo{font-family:'Orbitron',monospace;font-size:0.9rem;letter-spacing:.15em}
+  .logo span{color:var(--red)}
+  .btn-logout{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'Rajdhani',sans-serif;font-size:0.85rem;padding:6px 16px;border-radius:4px;cursor:pointer;transition:border-color .15s,color .15s}
+  .btn-logout:hover{border-color:var(--red);color:var(--red)}
+
+  .tabs{display:flex;border-bottom:1px solid var(--border);padding:0 28px}
+  .tab{font-family:'Orbitron',monospace;font-size:0.7rem;letter-spacing:.15em;padding:14px 20px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;transition:color .15s,border-color .15s}
+  .tab.active{color:var(--text);border-bottom-color:var(--red)}
+  .tab:hover:not(.active){color:var(--text)}
+
+  .panel{display:none;padding:32px 28px;max-width:960px}
+  .panel.active{display:block}
+
+  h2{font-family:'Orbitron',monospace;font-size:0.8rem;letter-spacing:.2em;color:var(--muted);margin-bottom:20px}
+
+  /* ── Scores table ── */
+  .scores-table{width:100%;border-collapse:collapse}
+  .scores-table th{text-align:left;font-family:'Orbitron',monospace;font-size:0.65rem;letter-spacing:.15em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border)}
+  .scores-table td{padding:8px 12px;border-bottom:1px solid #1a1a1a;font-size:0.95rem;vertical-align:middle}
+  .scores-table tr:hover td{background:rgba(255,255,255,.02)}
+  .inline-input{background:#0a0a0a;border:1px solid var(--border);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:0.95rem;padding:4px 8px;border-radius:3px;width:100%;outline:none}
+  .inline-input:focus{border-color:var(--red)}
+  .btn-sm{font-size:0.75rem;font-family:'Orbitron',monospace;letter-spacing:.1em;padding:5px 12px;border-radius:3px;cursor:pointer;border:1px solid;transition:background .15s,color .15s}
+  .btn-save{border-color:#00aa55;color:#00aa55;background:transparent}
+  .btn-save:hover{background:#00aa55;color:#000}
+  .btn-del{border-color:#660011;color:#cc2244;background:transparent}
+  .btn-del:hover{background:#cc2244;color:#fff}
+  .badge{font-family:'Orbitron',monospace;font-size:0.75rem;color:var(--red)}
+
+  /* ── Config sections ── */
+  .config-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:640px){.config-grid{grid-template-columns:1fr}}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:0.72rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);font-family:'Orbitron',monospace}
+  .field input,.field textarea{background:#0a0a0a;border:1px solid var(--border);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:1rem;padding:9px 12px;border-radius:4px;outline:none;transition:border-color .2s;resize:vertical}
+  .field input:focus,.field textarea:focus{border-color:var(--red)}
+  .field .hint{font-size:0.78rem;color:var(--muted)}
+  .color-row{display:flex;gap:10px;align-items:center}
+  .color-row input[type=color]{width:44px;height:38px;padding:2px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:#0a0a0a}
+  .color-row input[type=text]{flex:1}
+
+  .btn-primary{font-family:'Orbitron',monospace;font-size:0.78rem;letter-spacing:.15em;padding:11px 28px;background:var(--red);color:#fff;border:none;border-radius:4px;cursor:pointer;transition:background .15s}
+  .btn-primary:hover{background:#ff0030}
+  .btn-primary:disabled{background:#330010;color:#660020;cursor:not-allowed}
+
+  .save-ok{color:#00ff88;font-family:'Orbitron',monospace;font-size:0.75rem;letter-spacing:.1em;opacity:0;transition:opacity .3s}
+  .save-ok.show{opacity:1}
+
+  /* ── Verdicts editor ── */
+  .verdicts-list{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+  .verdict-row{display:grid;grid-template-columns:80px 1fr 110px 36px;gap:8px;align-items:center}
+  .verdict-row input{background:#0a0a0a;border:1px solid var(--border);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:0.95rem;padding:6px 10px;border-radius:3px;outline:none}
+  .verdict-row input:focus{border-color:var(--red)}
+  .verdict-row input[type=color]{width:36px;height:34px;padding:2px;border-radius:3px;cursor:pointer}
+  .btn-icon{background:transparent;border:1px solid #330;color:#663;border-radius:3px;width:34px;height:34px;cursor:pointer;font-size:1rem;transition:border-color .15s,color .15s}
+  .btn-icon:hover{border-color:#cc2244;color:#cc2244}
+  .verdict-label{font-size:0.7rem;color:var(--muted);font-family:'Orbitron',monospace;letter-spacing:.1em;text-align:center}
+
+  .logo-preview{max-height:60px;max-width:200px;margin-top:8px;border-radius:4px;display:none}
+  .logo-preview.show{display:block}
+
+  .section-sep{border:none;border-top:1px solid var(--border);margin:28px 0}
+
+  .toast{position:fixed;bottom:28px;right:28px;background:#111;border:1px solid #00aa55;color:#00ff88;font-family:'Orbitron',monospace;font-size:0.75rem;letter-spacing:.1em;padding:12px 20px;border-radius:4px;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;pointer-events:none;z-index:100}
+  .toast.show{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast">✔ GUARDADO</div>
+
+<header>
+  <div class="logo">F1 <span>ADMIN</span></div>
+  <button class="btn-logout" onclick="logout()">Cerrar sesión</button>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('scores', this)">🏆 Leaderboard</div>
+  <div class="tab" onclick="switchTab('textos', this)">✏️ Textos</div>
+  <div class="tab" onclick="switchTab('interfaz', this)">🎨 Interfaz</div>
+</div>
+
+<!-- ═══════════ TAB: SCORES ═══════════ -->
+<div class="panel active" id="tab-scores">
+  <h2>GESTIÓN DEL LEADERBOARD</h2>
+  <p style="color:var(--muted);font-size:.85rem;margin-bottom:18px">Edita el nombre o el tiempo de cualquier entrada, o elimínala con la ✕.</p>
+  <table class="scores-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Piloto</th>
+        <th>Tiempo (ms)</th>
+        <th>Fecha</th>
+        <th></th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="scoresBody">
+      <tr><td colspan="6" style="color:var(--muted);padding:20px">Cargando...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ═══════════ TAB: TEXTOS ═══════════ -->
+<div class="panel" id="tab-textos">
+  <h2>MENSAJES DE RESULTADO</h2>
+  <p style="color:var(--muted);font-size:.85rem;margin-bottom:20px">
+    Cada fila es un nivel. El tiempo máximo define el umbral: si el jugador saca menos ms que ese valor, ve ese mensaje.
+    El último nivel se usa para todo lo que sea más lento.
+  </p>
+
+  <div style="display:grid;grid-template-columns:80px 1fr 110px 36px;gap:8px;margin-bottom:6px">
+    <div class="verdict-label">Máx ms</div>
+    <div class="verdict-label">Texto del mensaje</div>
+    <div class="verdict-label">Color</div>
+    <div></div>
+  </div>
+  <div class="verdicts-list" id="verdictsList"></div>
+
+  <button class="btn-sm btn-save" style="margin-bottom:24px" onclick="addVerdict()">+ Añadir nivel</button>
+
+  <br>
+  <button class="btn-primary" onclick="saveVerdicts()">GUARDAR MENSAJES</button>
+</div>
+
+<!-- ═══════════ TAB: INTERFAZ ═══════════ -->
+<div class="panel" id="tab-interfaz">
+  <h2>PERSONALIZACIÓN VISUAL</h2>
+
+  <div class="config-grid">
+    <div class="field">
+      <label>Título de la web</label>
+      <input type="text" id="cfg-site_title" placeholder="F1 REACTION TIMER">
+      <span class="hint">Aparece en la cabecera y en la pestaña del navegador</span>
+    </div>
+    <div class="field">
+      <label>Color principal</label>
+      <div class="color-row">
+        <input type="color" id="cfg-accent_color-picker" value="#E8002D" oninput="document.getElementById('cfg-accent_color').value=this.value">
+        <input type="text"  id="cfg-accent_color" value="#E8002D" oninput="document.getElementById('cfg-accent_color-picker').value=this.value">
+      </div>
+      <span class="hint">Color de las luces, botones y acentos</span>
+    </div>
+  </div>
+
+  <hr class="section-sep">
+
+  <div class="field" style="max-width:540px">
+    <label>URL de tu logo / imagen de cabecera</label>
+    <input type="text" id="cfg-logo_url" placeholder="https://i.imgur.com/tuimagen.png" oninput="previewLogo(this.value)">
+    <span class="hint">Pega la URL de una imagen (puedes subirla a <a href="https://imgur.com" target="_blank" style="color:var(--red)">imgur.com</a> gratis). Déjalo vacío para no mostrar logo.</span>
+    <img id="logoPreview" class="logo-preview" src="" alt="preview">
+  </div>
+
+  <hr class="section-sep">
+
+  <button class="btn-primary" onclick="saveInterfaz()">GUARDAR CAMBIOS</button>
+</div>
+
+<script>
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name, el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  if(name==='scores') loadScores();
+  if(name==='textos') loadVerdicts();
+  if(name==='interfaz') loadInterfaz();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg='✔ GUARDADO'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+async function logout(){
+  await fetch('/api/admin/logout',{method:'POST'});
+  location.reload();
+}
+
+// ═══════════════ SCORES ═══════════════════════════════════════════════════════
+async function loadScores(){
+  const res=await fetch('/api/admin/scores');
+  const data=await res.json();
+  const body=document.getElementById('scoresBody');
+  if(!data.length){
+    body.innerHTML='<tr><td colspan="6" style="color:var(--muted);padding:20px">No hay tiempos registrados aún</td></tr>';
+    return;
+  }
+  body.innerHTML=data.map((r,i)=>`
+    <tr id="row-${r.id}">
+      <td><span class="badge">${i+1}</span></td>
+      <td><input class="inline-input" id="name-${r.id}" value="${esc(r.username)}"></td>
+      <td><input class="inline-input" id="ms-${r.id}" value="${r.reaction_ms}" style="width:90px" type="number" min="1"></td>
+      <td style="color:var(--muted);font-size:.82rem">${r.created_at.slice(0,16).replace('T',' ')}</td>
+      <td><button class="btn-sm btn-save" onclick="saveScore(${r.id})">GUARDAR</button></td>
+      <td><button class="btn-sm btn-del" onclick="deleteScore(${r.id})">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+async function saveScore(id){
+  const username=document.getElementById('name-'+id).value.trim();
+  const reaction_ms=parseInt(document.getElementById('ms-'+id).value);
+  if(!username)return;
+  await fetch(`/api/admin/scores/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,reaction_ms})});
+  showToast('✔ GUARDADO');
+  loadScores();
+}
+
+async function deleteScore(id){
+  if(!confirm('¿Eliminar esta entrada?'))return;
+  await fetch(`/api/admin/scores/${id}`,{method:'DELETE'});
+  document.getElementById('row-'+id)?.remove();
+  showToast('🗑 ELIMINADO');
+}
+
+function esc(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+// ═══════════════ VERDICTS ═════════════════════════════════════════════════════
+let verdicts=[];
+
+async function loadVerdicts(){
+  const res=await fetch('/api/admin/config');
+  const cfg=await res.json();
+  try{ verdicts=JSON.parse(cfg.verdicts); }catch(e){ verdicts=[]; }
+  renderVerdicts();
+}
+
+function renderVerdicts(){
+  const list=document.getElementById('verdictsList');
+  list.innerHTML=verdicts.map((v,i)=>`
+    <div class="verdict-row" id="vrow-${i}">
+      <input type="number" value="${v.max_ms>=99999?'':v.max_ms}" placeholder="ms" id="vmax-${i}" min="1">
+      <input type="text"   value="${esc(v.text)}" id="vtxt-${i}" placeholder="Texto del mensaje">
+      <input type="color"  value="${v.color||'#ffffff'}" id="vcol-${i}">
+      <button class="btn-icon" onclick="removeVerdict(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function collectVerdicts(){
+  return verdicts.map((_,i)=>({
+    max_ms: parseInt(document.getElementById('vmax-'+i).value)||99999,
+    text:   document.getElementById('vtxt-'+i).value,
+    color:  document.getElementById('vcol-'+i).value,
+  })).sort((a,b)=>a.max_ms-b.max_ms);
+}
+
+function addVerdict(){
+  verdicts.push({max_ms:99999,text:'Nuevo nivel',color:'#ffffff'});
+  renderVerdicts();
+}
+
+function removeVerdict(i){
+  verdicts.splice(i,1);
+  renderVerdicts();
+}
+
+async function saveVerdicts(){
+  const newVerdicts=collectVerdicts();
+  // Last entry always has max 99999
+  if(newVerdicts.length) newVerdicts[newVerdicts.length-1].max_ms=99999;
+  await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({verdicts:newVerdicts})});
+  verdicts=newVerdicts;
+  renderVerdicts();
+  showToast('✔ MENSAJES GUARDADOS');
+}
+
+// ═══════════════ INTERFAZ ═════════════════════════════════════════════════════
+async function loadInterfaz(){
+  const res=await fetch('/api/admin/config');
+  const cfg=await res.json();
+  document.getElementById('cfg-site_title').value = cfg.site_title||'';
+  document.getElementById('cfg-accent_color').value = cfg.accent_color||'#E8002D';
+  document.getElementById('cfg-accent_color-picker').value = cfg.accent_color||'#E8002D';
+  document.getElementById('cfg-logo_url').value = cfg.logo_url||'';
+  previewLogo(cfg.logo_url||'');
+}
+
+function previewLogo(url){
+  const img=document.getElementById('logoPreview');
+  if(url){ img.src=url; img.classList.add('show'); }
+  else    { img.classList.remove('show'); }
+}
+
+async function saveInterfaz(){
+  const data={
+    site_title:   document.getElementById('cfg-site_title').value.trim(),
+    accent_color: document.getElementById('cfg-accent_color').value,
+    logo_url:     document.getElementById('cfg-logo_url').value.trim(),
+  };
+  await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  showToast('✔ CAMBIOS GUARDADOS — recarga la web principal para verlos');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadScores();
+</script>
+</body>
+</html>

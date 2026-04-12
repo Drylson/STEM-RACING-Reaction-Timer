@@ -74,7 +74,7 @@ def leaderboard():
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
-        SELECT username, MIN(reaction_ms) AS best_ms
+        SELECT MIN(username) AS username, MIN(reaction_ms) AS best_ms
         FROM scores
         GROUP BY LOWER(username)
         ORDER BY best_ms ASC
@@ -94,6 +94,6 @@ with app.app_context():
 # ── entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("\n  🏎️  F1 Reaction Timer arrancando...")
+    print("\n  🏎️  STEM Racing Reaction Timer arrancando...")
     print("  Abre tu navegador en:  http://localhost:5000\n")
     app.run(debug=False, port=5000)

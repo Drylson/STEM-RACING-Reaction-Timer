@@ -265,11 +265,25 @@
     .side-panel { width: 100%; border-left: none; border-top: 1px solid var(--border); }
     .reaction-ms { font-size: 3rem; }
   }
+
+  /* ── Mobile touch fixes ── */
+  * { -webkit-tap-highlight-color: transparent; }
+  body { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+  .username-box input { -webkit-user-select: text; user-select: text; }
+  #clickZone { touch-action: manipulation; }
+  .btn-start { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  @media (max-width: 768px) {
+    .lights-housing { padding: 16px 20px; gap: 12px; }
+    .light { width: 48px; height: 48px; }
+    .reaction-ms { font-size: 3.2rem; }
+    .main-panel { gap: 28px; padding: 28px 16px; }
+    .btn-start { padding: 18px 52px; font-size: 1rem; }
+  }
 </style>
 </head>
 <body>
 
-<div id="clickZone" onclick="handleClick()"></div>
+<div id="clickZone"></div>
 
 <header>
   <div class="logo-stripe"></div>
@@ -298,7 +312,7 @@
       <div class="reaction-label" id="reactionLabel">Tiempo de reacción</div>
       <div class="reaction-verdict" id="reactionVerdict"></div>
     </div>
-    <button class="btn-start" id="btnStart" onclick="startSequence()">START</button>
+    <button class="btn-start" id="btnStart">START</button>
     <div class="save-section" id="saveSection">
       <button class="btn-save" id="btnSave" onclick="saveScore()">💾 Guardar en leaderboard</button>
       <div class="save-note" id="saveNote"></div>
@@ -560,9 +574,28 @@ function esc(s) {
 document.addEventListener('keydown', function(e) {
   if (e.code === 'Space' && e.target === document.body) {
     e.preventDefault();
-    if (state === 'idle')                          startSequence();
+    if (state === 'idle') startSequence();
     else if (state === 'sequence' || state === 'waiting') handleClick();
   }
+});
+
+/* ── touch & click binding ── */
+function bindTap(el, fn) {
+  var fired = false;
+  el.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    fired = true;
+    fn();
+  }, { passive: false });
+  el.addEventListener('click', function(e) {
+    if (fired) { fired = false; return; }
+    fn();
+  });
+}
+
+bindTap(clickZone, handleClick);
+bindTap(btnStart,  function() {
+  if (state === 'idle') startSequence();
 });
 
 /* ── init ── */

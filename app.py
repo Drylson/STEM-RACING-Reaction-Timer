@@ -255,4 +255,3 @@ if __name__ == "__main__":
     print("  Abre tu navegador en:  http://localhost:5000")
     print("  Panel admin en:        http://localhost:5000/admin\n")
     app.run(debug=False, port=5000)
-

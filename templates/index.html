@@ -295,7 +295,7 @@
   <div class="main-panel">
     <div class="username-box">
       <label>Nombre de piloto</label>
-      <input type="text" id="username" placeholder="Tu nombre (opcional)" maxlength="20" autocomplete="off">
+      <input type="text" id="username" placeholder="Tu nombre" maxlength="20" autocomplete="off">
     </div>
     <div class="lights-panel">
       <div class="lights-housing">
@@ -434,7 +434,7 @@ function startSequence() {
   lightTimers = delays.map(function(d, i) {
     return setTimeout(function() {
       lights[i].classList.add('on');
-      if (i === 4) setStatus('MOTORES AL MÁXIMO...', 'active');
+      if (i === 4) setStatus('LISTOS...', 'active');
     }, d);
   });
 
@@ -443,7 +443,7 @@ function startSequence() {
     resetLights();
     state     = 'waiting';
     startTime = performance.now();
-    setStatus('¡¡ ARRANCA !!', 'go');
+    setStatus('¡¡ YA !!', 'go');
     clickZone.style.display = 'block';
   }, 3000 + extraWait);
 
@@ -473,7 +473,7 @@ function falseStart() {
 
   setStatus('🚩 SALIDA EN FALSO', 'early');
   elReactionMs.innerHTML        = '—<span>ms</span>';
-  elVerdict.textContent         = 'Salida en falso — ¡penalización!';
+  elVerdict.textContent         = 'Salida en falso, espera a que se apaguen las luces del semáforo';
   elVerdict.style.color         = 'var(--red)';
   elReactionMs.style.display    = 'block';
   elReactionLabel.style.display = 'block';

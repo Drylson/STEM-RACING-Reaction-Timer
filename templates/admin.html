@@ -91,17 +91,22 @@
   <div class="tab active" onclick="switchTab('scores', this)">🏆 Leaderboard</div>
   <div class="tab" onclick="switchTab('textos', this)">✏️ Textos</div>
   <div class="tab" onclick="switchTab('interfaz', this)">🎨 Interfaz</div>
+  <div class="tab" onclick="switchTab('equipo', this)">🏁 Equipo & Normas</div>
 </div>
 
 <!-- ═══════════ TAB: SCORES ═══════════ -->
 <div class="panel active" id="tab-scores">
-  <h2>GESTIÓN DEL LEADERBOARD</h2>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+    <h2 style="margin-bottom:0">GESTIÓN DEL LEADERBOARD</h2>
+    <button class="btn-sm btn-save" onclick="exportCSV()">⬇ Exportar CSV</button>
+  </div>
   <p style="color:var(--muted);font-size:.85rem;margin-bottom:18px">Edita el nombre o el tiempo de cualquier entrada, o elimínala con la ✕.</p>
   <table class="scores-table">
     <thead>
       <tr>
         <th>#</th>
         <th>Piloto</th>
+        <th>Email</th>
         <th>Tiempo (ms)</th>
         <th>Fecha</th>
         <th></th>
@@ -109,7 +114,7 @@
       </tr>
     </thead>
     <tbody id="scoresBody">
-      <tr><td colspan="6" style="color:var(--muted);padding:20px">Cargando...</td></tr>
+      <tr><td colspan="7" style="color:var(--muted);padding:20px">Cargando...</td></tr>
     </tbody>
   </table>
 </div>
@@ -170,6 +175,42 @@
   <button class="btn-primary" onclick="saveInterfaz()">GUARDAR CAMBIOS</button>
 </div>
 
+<!-- ═══════════ TAB: EQUIPO & NORMAS ═══════════ -->
+<div class="panel" id="tab-equipo">
+  <h2>NORMAS DEL JUEGO</h2>
+  <div class="field" style="margin-bottom:28px">
+    <label>Texto de las normas (botón "?" de la web)</label>
+    <textarea id="cfg-rules_text" rows="7" placeholder="Escribe aquí las normas, una por línea..."></textarea>
+    <span class="hint">Cada línea aparece como un párrafo separado en la ventana de normas.</span>
+  </div>
+
+  <hr class="section-sep">
+
+  <h2>IDENTIDAD DEL EQUIPO</h2>
+  <div class="config-grid">
+    <div class="field">
+      <label>Texto del distintivo (esquina inferior izquierda)</label>
+      <input type="text" id="cfg-team_badge_text" placeholder="Equipo INFINITY">
+      <span class="hint">Aparece discretamente en la esquina, no molesta al juego</span>
+    </div>
+    <div class="field">
+      <label>Enlace al hacer clic (opcional)</label>
+      <input type="text" id="cfg-team_badge_link" placeholder="https://instagram.com/tuequipo">
+      <span class="hint">Si lo rellenas, el distintivo será clicable</span>
+    </div>
+  </div>
+
+  <div class="field" style="max-width:540px;margin-top:20px">
+    <label>Vídeo del distintivo (opcional, .mp4)</label>
+    <input type="text" id="cfg-team_video_url" placeholder="https://tusitio.com/logo-animado.mp4">
+    <span class="hint">Vídeo corto en bucle, sin sonido, que se muestra como un pequeño círculo junto al texto del distintivo. Déjalo vacío si no tienes.</span>
+  </div>
+
+  <hr class="section-sep">
+
+  <button class="btn-primary" onclick="saveEquipo()">GUARDAR CAMBIOS</button>
+</div>
+
 <script>
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 function switchTab(name, el){
@@ -180,6 +221,7 @@ function switchTab(name, el){
   if(name==='scores') loadScores();
   if(name==='textos') loadVerdicts();
   if(name==='interfaz') loadInterfaz();
+  if(name==='equipo') loadEquipo();
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -202,13 +244,14 @@ async function loadScores(){
   const data=await res.json();
   const body=document.getElementById('scoresBody');
   if(!data.length){
-    body.innerHTML='<tr><td colspan="6" style="color:var(--muted);padding:20px">No hay tiempos registrados aún</td></tr>';
+    body.innerHTML='<tr><td colspan="7" style="color:var(--muted);padding:20px">No hay tiempos registrados aún</td></tr>';
     return;
   }
   body.innerHTML=data.map((r,i)=>`
     <tr id="row-${r.id}">
       <td><span class="badge">${i+1}</span></td>
       <td><input class="inline-input" id="name-${r.id}" value="${esc(r.username)}"></td>
+      <td><input class="inline-input" id="email-${r.id}" value="${esc(r.email||'')}" style="min-width:160px"></td>
       <td><input class="inline-input" id="ms-${r.id}" value="${r.reaction_ms}" style="width:90px" type="number" min="1"></td>
       <td style="color:var(--muted);font-size:.82rem">${r.created_at.slice(0,16).replace('T',' ')}</td>
       <td><button class="btn-sm btn-save" onclick="saveScore(${r.id})">GUARDAR</button></td>
@@ -219,9 +262,10 @@ async function loadScores(){
 
 async function saveScore(id){
   const username=document.getElementById('name-'+id).value.trim();
+  const email=document.getElementById('email-'+id).value.trim();
   const reaction_ms=parseInt(document.getElementById('ms-'+id).value);
   if(!username)return;
-  await fetch(`/api/admin/scores/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,reaction_ms})});
+  await fetch(`/api/admin/scores/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,email,reaction_ms})});
   showToast('✔ GUARDADO');
   loadScores();
 }
@@ -231,6 +275,19 @@ async function deleteScore(id){
   await fetch(`/api/admin/scores/${id}`,{method:'DELETE'});
   document.getElementById('row-'+id)?.remove();
   showToast('🗑 ELIMINADO');
+}
+
+async function exportCSV(){
+  const res=await fetch('/api/admin/scores');
+  const data=await res.json();
+  const header='id,username,email,reaction_ms,created_at';
+  const rows=data.map(r=>`${r.id},"${r.username.replace(/"/g,'""')}","${(r.email||'').replace(/"/g,'""')}",${r.reaction_ms},"${r.created_at}"`);
+  const csv=[header,...rows].join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='leaderboard.csv'; a.click();
+  URL.revokeObjectURL(url);
 }
 
 function esc(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -308,6 +365,27 @@ async function saveInterfaz(){
     site_title:   document.getElementById('cfg-site_title').value.trim(),
     accent_color: document.getElementById('cfg-accent_color').value,
     logo_url:     document.getElementById('cfg-logo_url').value.trim(),
+  };
+  await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  showToast('✔ CAMBIOS GUARDADOS — recarga la web principal para verlos');
+}
+
+// ═══════════════ EQUIPO & NORMAS ═══════════════════════════════════════════════
+async function loadEquipo(){
+  const res=await fetch('/api/admin/config');
+  const cfg=await res.json();
+  document.getElementById('cfg-rules_text').value      = cfg.rules_text || '';
+  document.getElementById('cfg-team_badge_text').value = cfg.team_badge_text || '';
+  document.getElementById('cfg-team_badge_link').value = cfg.team_badge_link || '';
+  document.getElementById('cfg-team_video_url').value  = cfg.team_video_url || '';
+}
+
+async function saveEquipo(){
+  const data={
+    rules_text:      document.getElementById('cfg-rules_text').value,
+    team_badge_text: document.getElementById('cfg-team_badge_text').value.trim(),
+    team_badge_link: document.getElementById('cfg-team_badge_link').value.trim(),
+    team_video_url:  document.getElementById('cfg-team_video_url').value.trim(),
   };
   await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   showToast('✔ CAMBIOS GUARDADOS — recarga la web principal para verlos');

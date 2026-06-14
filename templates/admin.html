@@ -92,6 +92,7 @@
   <div class="tab" onclick="switchTab('textos', this)">✏️ Textos</div>
   <div class="tab" onclick="switchTab('interfaz', this)">🎨 Interfaz</div>
   <div class="tab" onclick="switchTab('equipo', this)">🏁 Equipo & Normas</div>
+  <div class="tab" onclick="switchTab('extras', this)">📣 Extras</div>
 </div>
 
 <!-- ═══════════ TAB: SCORES ═══════════ -->
@@ -211,6 +212,40 @@
   <button class="btn-primary" onclick="saveEquipo()">GUARDAR CAMBIOS</button>
 </div>
 
+<!-- ═══════════ TAB: EXTRAS ═══════════ -->
+<div class="panel" id="tab-extras">
+  <h2>RECUADRO SUPERIOR</h2>
+  <div class="field" style="margin-bottom:28px;max-width:640px">
+    <label>Texto del banner (encima de la cabecera)</label>
+    <textarea id="cfg-banner_text" rows="2" placeholder="Ej: ¡El mejor tiempo de la semana gana una sorpresa! 🏆"></textarea>
+    <span class="hint">Aparece como una franja en la parte superior de la web. Déjalo vacío para ocultarlo.</span>
+  </div>
+  <button class="btn-primary" onclick="saveBanner()">GUARDAR BANNER</button>
+
+  <hr class="section-sep">
+
+  <h2>VÍDEO DE RESULTADO</h2>
+  <p style="color:var(--muted);font-size:.85rem;margin-bottom:18px;max-width:640px">
+    Este vídeo se reproducirá <strong>con sonido</strong> automáticamente cada vez que un jugador obtenga un tiempo,
+    superpuesto a toda la pantalla, y se cerrará solo (a los ~1.2 segundos o cuando termine el vídeo, lo que ocurra antes).
+    Formatos admitidos: <strong>MP4</strong> (recomendado), MOV o WebM. Tamaño máximo 20MB.
+  </p>
+
+  <div id="videoStatus" style="margin-bottom:14px;font-size:0.9rem;color:var(--muted)">Comprobando...</div>
+
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+    <input type="file" id="videoFile" accept="video/mp4,video/quicktime,video/webm,.mov,.mp4,.webm" style="color:var(--text);font-family:'Rajdhani',sans-serif">
+    <button class="btn-primary" id="btnUploadVideo" onclick="uploadVideo()">⬆ SUBIR VÍDEO</button>
+    <button class="btn-sm btn-del" id="btnDeleteVideo" onclick="deleteVideo()" style="display:none">✕ ELIMINAR VÍDEO ACTUAL</button>
+  </div>
+  <div id="uploadProgress" style="font-size:0.85rem;color:var(--muted)"></div>
+
+  <p style="color:var(--muted);font-size:.8rem;margin-top:8px;max-width:640px">
+    ⚠️ Si tu archivo es .mov y no se reproduce bien en algunos navegadores (Chrome/Android), te recomendamos
+    convertirlo a .mp4 (H.264) — por ejemplo con <a href="https://www.freeconvert.com/mov-to-mp4" target="_blank" style="color:var(--red)">freeconvert.com</a>, gratis y sin instalar nada.
+  </p>
+</div>
+
 <script>
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 function switchTab(name, el){
@@ -222,6 +257,7 @@ function switchTab(name, el){
   if(name==='textos') loadVerdicts();
   if(name==='interfaz') loadInterfaz();
   if(name==='equipo') loadEquipo();
+  if(name==='extras') loadExtras();
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -389,6 +425,78 @@ async function saveEquipo(){
   };
   await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   showToast('✔ CAMBIOS GUARDADOS — recarga la web principal para verlos');
+}
+
+// ═══════════════ EXTRAS (banner + vídeo de resultado) ══════════════════════════
+async function loadExtras(){
+  const res=await fetch('/api/admin/config');
+  const cfg=await res.json();
+  document.getElementById('cfg-banner_text').value = cfg.banner_text || '';
+  await refreshVideoStatus();
+}
+
+async function saveBanner(){
+  const data={ banner_text: document.getElementById('cfg-banner_text').value };
+  await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  showToast('✔ BANNER GUARDADO — recarga la web principal para verlo');
+}
+
+async function refreshVideoStatus(){
+  const statusEl=document.getElementById('videoStatus');
+  const delBtn=document.getElementById('btnDeleteVideo');
+  try{
+    const res=await fetch('/api/admin/video');
+    const data=await res.json();
+    if(data.exists){
+      const sizeKb=Math.round((data.size||0)/1024);
+      statusEl.innerHTML=`✅ Vídeo activo: <strong>${esc(data.filename)}</strong> (${sizeKb} KB, ${esc(data.content_type||'')})`;
+      delBtn.style.display='inline-block';
+    }else{
+      statusEl.textContent='— No hay ningún vídeo de resultado configurado —';
+      delBtn.style.display='none';
+    }
+  }catch(e){
+    statusEl.textContent='Error comprobando el estado del vídeo';
+  }
+}
+
+async function uploadVideo(){
+  const fileInput=document.getElementById('videoFile');
+  const progress=document.getElementById('uploadProgress');
+  const btn=document.getElementById('btnUploadVideo');
+  if(!fileInput.files.length){ progress.textContent='Elige un archivo primero.'; return; }
+
+  const file=fileInput.files[0];
+  if(file.size > 20*1024*1024){ progress.textContent='El archivo supera los 20MB.'; return; }
+
+  const formData=new FormData();
+  formData.append('video', file);
+
+  btn.disabled=true;
+  progress.textContent='Subiendo...';
+
+  try{
+    const res=await fetch('/api/admin/video',{method:'POST',body:formData});
+    const data=await res.json();
+    if(res.ok){
+      progress.textContent='✔ Subido correctamente';
+      fileInput.value='';
+      showToast('✔ VÍDEO SUBIDO');
+      await refreshVideoStatus();
+    }else{
+      progress.textContent='Error: '+(data.error||'desconocido');
+    }
+  }catch(e){
+    progress.textContent='Error de conexión al subir el vídeo';
+  }
+  btn.disabled=false;
+}
+
+async function deleteVideo(){
+  if(!confirm('¿Eliminar el vídeo de resultado actual?'))return;
+  await fetch('/api/admin/video',{method:'DELETE'});
+  showToast('🗑 VÍDEO ELIMINADO');
+  await refreshVideoStatus();
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

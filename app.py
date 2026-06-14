@@ -58,6 +58,21 @@ def init_db():
     conn.commit()
     cur.close()
     conn.close()
+    ensure_email_column()
+
+def ensure_email_column():
+    conn = get_conn()
+    cur  = conn.cursor()
+    if DATABASE_URL:
+        cur.execute("ALTER TABLE scores ADD COLUMN IF NOT EXISTS email TEXT")
+    else:
+        cur.execute("PRAGMA table_info(scores)")
+        cols = [r[1] for r in cur.fetchall()]
+        if "email" not in cols:
+            cur.execute("ALTER TABLE scores ADD COLUMN email TEXT")
+    conn.commit()
+    cur.close()
+    conn.close()
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +80,16 @@ DEFAULT_CONFIG = {
     "site_title":   "F1 REACTION TIMER",
     "logo_url":     "",
     "accent_color": "#E8002D",
+    "rules_text": (
+        "1. Escribe tu nombre y tu correo electrónico antes de pulsar START.\n"
+        "2. Espera a que se enciendan las 5 luces rojas y luego se apaguen — ¡ahí debes reaccionar!\n"
+        "3. Si reaccionas antes de que se apaguen, es salida en falso (penalización).\n"
+        "4. Tu mejor tiempo aparecerá en el leaderboard.\n"
+        "5. El correo solo se usa para avisar al ganador del premio — no se muestra públicamente."
+    ),
+    "team_badge_text":  "Equipo INFINITY",
+    "team_badge_link":  "",
+    "team_video_url":   "",
     "verdicts": json.dumps([
         {"max_ms": 150,   "text": "⚡ INCREÍBLE — Nivel F1",           "color": "#00ff88"},
         {"max_ms": 200,   "text": "🏎️ EXCELENTE — Muy rápido",         "color": "#88ff44"},
@@ -126,14 +151,20 @@ def api_config():
 def submit_score():
     data        = request.get_json()
     username    = (data.get("username") or "").strip()[:20]
+    email       = (data.get("email") or "").strip()[:100]
     reaction_ms = data.get("reaction_ms")
+
     if not username or not isinstance(reaction_ms, (int, float)) or reaction_ms <= 0:
         return jsonify({"error": "Invalid data"}), 400
+
+    if not email or "@" not in email or "." not in email.split("@")[-1]:
+        return jsonify({"error": "Email inválido"}), 400
+
     conn = get_conn()
     cur  = conn.cursor()
     cur.execute(
-        f"INSERT INTO scores (username, reaction_ms) VALUES ({ph()}, {ph()})",
-        (username, int(reaction_ms)),
+        f"INSERT INTO scores (username, email, reaction_ms) VALUES ({ph()}, {ph()}, {ph()})",
+        (username, email, int(reaction_ms)),
     )
     conn.commit()
     cur.close()
@@ -183,12 +214,12 @@ def admin_scores():
         return jsonify({"error": "No autorizado"}), 401
     conn = get_conn()
     cur  = conn.cursor()
-    cur.execute("SELECT id, username, reaction_ms, created_at FROM scores ORDER BY reaction_ms ASC")
+    cur.execute("SELECT id, username, email, reaction_ms, created_at FROM scores ORDER BY reaction_ms ASC")
     rows = cur.fetchall()
     cur.close()
     conn.close()
     return jsonify([
-        {"id": r[0], "username": r[1], "reaction_ms": r[2], "created_at": str(r[3])}
+        {"id": r[0], "username": r[1], "email": r[2] or "", "reaction_ms": r[3], "created_at": str(r[4])}
         for r in rows
     ])
 
@@ -198,6 +229,7 @@ def admin_update_score(score_id):
         return jsonify({"error": "No autorizado"}), 401
     data        = request.get_json()
     username    = (data.get("username") or "").strip()[:20]
+    email       = (data.get("email") or "").strip()[:100]
     reaction_ms = data.get("reaction_ms")
     if not username:
         return jsonify({"error": "Nombre vacío"}), 400
@@ -205,11 +237,11 @@ def admin_update_score(score_id):
     cur  = conn.cursor()
     if reaction_ms is not None:
         cur.execute(
-            f"UPDATE scores SET username={ph()}, reaction_ms={ph()} WHERE id={ph()}",
-            (username, int(reaction_ms), score_id)
+            f"UPDATE scores SET username={ph()}, email={ph()}, reaction_ms={ph()} WHERE id={ph()}",
+            (username, email, int(reaction_ms), score_id)
         )
     else:
-        cur.execute(f"UPDATE scores SET username={ph()} WHERE id={ph()}", (username, score_id))
+        cur.execute(f"UPDATE scores SET username={ph()}, email={ph()} WHERE id={ph()}", (username, email, score_id))
     conn.commit()
     cur.close()
     conn.close()

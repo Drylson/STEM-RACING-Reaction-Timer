@@ -363,11 +363,60 @@
   @media (max-width: 768px) {
     .team-badge { bottom: 10px; left: 10px; font-size: 0.6rem; padding: 5px 10px; }
   }
+
+  /* ── Top banner ── */
+  .top-banner {
+    display: none;
+    background: linear-gradient(90deg, rgba(232,0,45,0.15), rgba(232,0,45,0.05));
+    border-bottom: 1px solid rgba(232,0,45,0.3);
+    color: var(--text);
+    font-size: 0.92rem;
+    font-weight: 600;
+    text-align: center;
+    padding: 10px 20px;
+    letter-spacing: 0.02em;
+    position: relative;
+    z-index: 2;
+  }
+  .top-banner.show { display: block; }
+
+  /* ── Video overlay (intro splash) ── */
+  .video-overlay {
+    position: fixed; inset: 0;
+    background: #000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+  }
+  .video-overlay.show { display: flex; }
+  .video-overlay video {
+    max-width: 100%;
+    max-height: 100%;
+  }
+  .btn-skip {
+    position: absolute;
+    top: 20px; right: 20px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: #fff;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    padding: 8px 18px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  .btn-skip:hover { background: rgba(232,0,45,0.5); border-color: var(--red); }
 </style>
 </head>
 <body>
 
 <div id="clickZone"></div>
+
+<!-- Top banner -->
+<div class="top-banner" id="topBanner"></div>
 
 <header>
   <div class="logo-stripe"></div>
@@ -375,6 +424,12 @@
   <div class="logo-text" id="logoText">F1 <span>REACTION</span> TIMER</div>
   <button class="btn-rules" id="btnRules" title="Cómo jugar">?</button>
 </header>
+
+<!-- Reaction result video overlay -->
+<div class="video-overlay" id="resultVideoOverlay">
+  <video id="resultVideo" playsinline></video>
+  <button class="btn-skip" id="btnSkipResultVideo">✕ Saltar</button>
+</div>
 
 <!-- Rules modal -->
 <div class="rules-overlay" id="rulesOverlay">
@@ -491,6 +546,16 @@ function applyConfig() {
   }
   if (siteConfig.rules_text) {
     document.getElementById('rulesBody').textContent = siteConfig.rules_text;
+  }
+  if (siteConfig.banner_text && siteConfig.banner_text.trim()) {
+    var banner = document.getElementById('topBanner');
+    banner.textContent = siteConfig.banner_text;
+    banner.classList.add('show');
+  }
+  if (siteConfig.has_overlay_video) {
+    var vid = document.getElementById('resultVideo');
+    vid.src = '/api/media/overlay_video';
+    vid.load();
   }
   if (siteConfig.team_badge_text) {
     document.getElementById('teamBadgeText').textContent = siteConfig.team_badge_text;
@@ -631,6 +696,41 @@ function showResult(ms) {
 
   btnStart.textContent = 'REPETIR';
   state = 'idle';
+
+  playResultVideo();
+}
+
+/* ── result video overlay ── */
+var resultVideoTimeout = null;
+
+function playResultVideo() {
+  if (!siteConfig || !siteConfig.has_overlay_video) return;
+  var overlay = document.getElementById('resultVideoOverlay');
+  var vid     = document.getElementById('resultVideo');
+
+  vid.muted = false;
+  vid.currentTime = 0;
+  overlay.classList.add('show');
+
+  var played = vid.play();
+  if (played && played.catch) {
+    played.catch(function() {
+      // Browser blocked audio autoplay — retry muted so at least the visual shows
+      vid.muted = true;
+      vid.play().catch(function(){});
+    });
+  }
+
+  clearTimeout(resultVideoTimeout);
+  resultVideoTimeout = setTimeout(closeResultVideoOverlay, 1200);
+}
+
+function closeResultVideoOverlay() {
+  clearTimeout(resultVideoTimeout);
+  var overlay = document.getElementById('resultVideoOverlay');
+  var vid     = document.getElementById('resultVideo');
+  overlay.classList.remove('show');
+  vid.pause();
 }
 
 /* ── save score ── */
@@ -738,6 +838,10 @@ document.getElementById('btnCloseRules').addEventListener('click', function(){
 rulesOverlay.addEventListener('click', function(e){
   if (e.target === rulesOverlay) rulesOverlay.classList.remove('show');
 });
+
+/* ── result video overlay wiring ── */
+document.getElementById('btnSkipResultVideo').addEventListener('click', closeResultVideoOverlay);
+document.getElementById('resultVideo').addEventListener('ended', closeResultVideoOverlay);
 
 /* ── init ── */
 loadConfig();

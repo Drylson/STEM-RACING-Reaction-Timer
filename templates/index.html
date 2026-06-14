@@ -279,6 +279,90 @@
     .main-panel { gap: 28px; padding: 28px 16px; }
     .btn-start { padding: 18px 52px; font-size: 1rem; }
   }
+
+  /* ── Rules button & modal ── */
+  .btn-rules {
+    margin-left: auto;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .btn-rules:hover { border-color: var(--red); color: var(--red); }
+
+  .rules-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 20px;
+  }
+  .rules-overlay.show { display: flex; }
+  .rules-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px 32px;
+    max-width: 460px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    box-shadow: 0 12px 60px rgba(0,0,0,0.6);
+  }
+  .rules-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    color: var(--red);
+  }
+  .rules-body {
+    font-size: 0.98rem;
+    line-height: 1.7;
+    color: var(--text);
+    white-space: pre-line;
+  }
+
+  /* ── Team corner badge ── */
+  .team-badge {
+    position: fixed;
+    bottom: 14px;
+    left: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(17,17,17,0.7);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    z-index: 40;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+    text-decoration: none;
+  }
+  .team-badge.has-link { pointer-events: auto; cursor: pointer; }
+  .team-badge #teamVideo {
+    display: none;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .team-badge #teamVideo.show { display: block; }
+  @media (max-width: 768px) {
+    .team-badge { bottom: 10px; left: 10px; font-size: 0.6rem; padding: 5px 10px; }
+  }
 </style>
 </head>
 <body>
@@ -289,13 +373,35 @@
   <div class="logo-stripe"></div>
   <img id="logoImg" src="" alt="">
   <div class="logo-text" id="logoText">F1 <span>REACTION</span> TIMER</div>
+  <button class="btn-rules" id="btnRules" title="Cómo jugar">?</button>
 </header>
+
+<!-- Rules modal -->
+<div class="rules-overlay" id="rulesOverlay">
+  <div class="rules-card">
+    <div class="rules-title">📋 CÓMO JUGAR</div>
+    <div class="rules-body" id="rulesBody">1. Escribe tu nombre y tu correo electrónico antes de pulsar START.
+2. Espera a que se enciendan las 5 luces rojas y luego se apaguen — ¡ahí debes reaccionar!
+3. Si reaccionas antes de que se apaguen, es salida en falso (penalización).
+4. Tu mejor tiempo aparecerá en el leaderboard.
+5. El correo solo se usa para avisar al ganador del premio — no se muestra públicamente.</div>
+    <button class="btn-save" id="btnCloseRules">Entendido</button>
+  </div>
+</div>
+
+<!-- Team corner badge -->
+<div class="team-badge" id="teamBadge">
+  <video id="teamVideo" autoplay loop muted playsinline></video>
+  <span id="teamBadgeText">Equipo INFINITY</span>
+</div>
 
 <div class="layout">
   <div class="main-panel">
     <div class="username-box">
       <label>Nombre de piloto</label>
-      <input type="text" id="username" placeholder="Tu nombre" maxlength="20" autocomplete="off">
+      <input type="text" id="username" placeholder="Tu nombre (opcional)" maxlength="20" autocomplete="off">
+      <label style="margin-top:14px">Correo electrónico</label>
+      <input type="email" id="email" placeholder="tu@email.com" maxlength="100" autocomplete="off">
     </div>
     <div class="lights-panel">
       <div class="lights-housing">
@@ -383,6 +489,24 @@ function applyConfig() {
     img.src = siteConfig.logo_url;
     img.style.display = 'block';
   }
+  if (siteConfig.rules_text) {
+    document.getElementById('rulesBody').textContent = siteConfig.rules_text;
+  }
+  if (siteConfig.team_badge_text) {
+    document.getElementById('teamBadgeText').textContent = siteConfig.team_badge_text;
+  }
+  if (siteConfig.team_video_url) {
+    var vid = document.getElementById('teamVideo');
+    vid.src = siteConfig.team_video_url;
+    vid.classList.add('show');
+  }
+  var badge = document.getElementById('teamBadge');
+  if (siteConfig.team_badge_link) {
+    badge.classList.add('has-link');
+    badge.addEventListener('click', function() {
+      window.open(siteConfig.team_badge_link, '_blank');
+    });
+  }
 }
 
 function getVerdict(ms) {
@@ -434,7 +558,7 @@ function startSequence() {
   lightTimers = delays.map(function(d, i) {
     return setTimeout(function() {
       lights[i].classList.add('on');
-      if (i === 4) setStatus('LISTOS...', 'active');
+      if (i === 4) setStatus('MOTORES AL MÁXIMO...', 'active');
     }, d);
   });
 
@@ -443,7 +567,7 @@ function startSequence() {
     resetLights();
     state     = 'waiting';
     startTime = performance.now();
-    setStatus('¡¡ YA !!', 'go');
+    setStatus('¡¡ ARRANCA !!', 'go');
     clickZone.style.display = 'block';
   }, 3000 + extraWait);
 
@@ -473,7 +597,7 @@ function falseStart() {
 
   setStatus('🚩 SALIDA EN FALSO', 'early');
   elReactionMs.innerHTML        = '—<span>ms</span>';
-  elVerdict.textContent         = 'Salida en falso, espera a que se apaguen las luces del semáforo';
+  elVerdict.textContent         = 'Salida en falso — ¡penalización!';
   elVerdict.style.color         = 'var(--red)';
   elReactionMs.style.display    = 'block';
   elReactionLabel.style.display = 'block';
@@ -513,7 +637,9 @@ function showResult(ms) {
 async function saveScore() {
   if (!lastReactionMs) return;
   var username = document.getElementById('username').value.trim();
+  var email    = document.getElementById('email').value.trim();
   if (!username) { alert('Introduce tu nombre de piloto primero.'); return; }
+  if (!email || email.indexOf('@') === -1) { alert('Introduce un correo electrónico válido.'); return; }
 
   btnSave.disabled    = true;
   btnSave.textContent = 'Guardando...';
@@ -522,17 +648,20 @@ async function saveScore() {
     var res = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: username, reaction_ms: lastReactionMs })
+      body: JSON.stringify({ username: username, email: email, reaction_ms: lastReactionMs })
     });
     if (res.ok) {
       saveOk.style.display  = 'block';
       btnSave.style.display = 'none';
       loadLeaderboard();
     } else {
-      btnSave.textContent = 'Error al guardar';
+      var err = await res.json().catch(function(){ return {}; });
+      btnSave.textContent = err.error || 'Error al guardar';
+      btnSave.disabled = false;
     }
   } catch(e) {
     btnSave.textContent = 'Error de conexión';
+    btnSave.disabled = false;
   }
 }
 
@@ -596,6 +725,18 @@ function bindTap(el, fn) {
 bindTap(clickZone, handleClick);
 bindTap(btnStart,  function() {
   if (state === 'idle') startSequence();
+});
+
+/* ── rules modal ── */
+var rulesOverlay = document.getElementById('rulesOverlay');
+document.getElementById('btnRules').addEventListener('click', function(){
+  rulesOverlay.classList.add('show');
+});
+document.getElementById('btnCloseRules').addEventListener('click', function(){
+  rulesOverlay.classList.remove('show');
+});
+rulesOverlay.addEventListener('click', function(e){
+  if (e.target === rulesOverlay) rulesOverlay.classList.remove('show');
 });
 
 /* ── init ── */

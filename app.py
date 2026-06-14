@@ -5,6 +5,7 @@ from flask import Flask, render_template, request, jsonify, session
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 20 MB max upload
 
 DATABASE_URL   = os.environ.get("DATABASE_URL")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin1234")
@@ -40,6 +41,14 @@ def init_db():
                 value TEXT NOT NULL
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS media (
+                key          TEXT PRIMARY KEY,
+                filename     TEXT,
+                content_type TEXT,
+                data         BYTEA
+            )
+        """)
     else:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS scores (
@@ -53,6 +62,14 @@ def init_db():
             CREATE TABLE IF NOT EXISTS config (
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS media (
+                key          TEXT PRIMARY KEY,
+                filename     TEXT,
+                content_type TEXT,
+                data         BLOB
             )
         """)
     conn.commit()
@@ -90,6 +107,8 @@ DEFAULT_CONFIG = {
     "team_badge_text":  "Equipo INFINITY",
     "team_badge_link":  "",
     "team_video_url":   "",
+    "banner_text":      "",
+    "result_video_url": "",
     "verdicts": json.dumps([
         {"max_ms": 150,   "text": "⚡ INCREÍBLE — Nivel F1",           "color": "#00ff88"},
         {"max_ms": 200,   "text": "🏎️ EXCELENTE — Muy rápido",         "color": "#88ff44"},
@@ -132,6 +151,59 @@ def set_config(key, value):
 def admin_logged_in():
     return session.get("admin") is True
 
+# ── Media (blob) helpers ────────────────────────────────────────────────────────
+
+def media_exists(key):
+    conn = get_conn()
+    cur  = conn.cursor()
+    cur.execute(f"SELECT 1 FROM media WHERE key={ph()}", (key,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return row is not None
+
+def media_get(key):
+    conn = get_conn()
+    cur  = conn.cursor()
+    cur.execute(f"SELECT filename, content_type, data FROM media WHERE key={ph()}", (key,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not row:
+        return None
+    filename, content_type, data = row
+    if DATABASE_URL and data is not None:
+        data = bytes(data)
+    return {"filename": filename, "content_type": content_type, "data": data}
+
+def media_set(key, filename, content_type, data):
+    conn = get_conn()
+    cur  = conn.cursor()
+    if DATABASE_URL:
+        import psycopg2
+        cur.execute(
+            "INSERT INTO media (key, filename, content_type, data) VALUES (%s, %s, %s, %s) "
+            "ON CONFLICT (key) DO UPDATE SET filename=EXCLUDED.filename, "
+            "content_type=EXCLUDED.content_type, data=EXCLUDED.data",
+            (key, filename, content_type, psycopg2.Binary(data))
+        )
+    else:
+        cur.execute(
+            "INSERT OR REPLACE INTO media (key, filename, content_type, data) VALUES (?, ?, ?, ?)",
+            (key, filename, content_type, data)
+        )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def media_delete(key):
+    conn = get_conn()
+    cur  = conn.cursor()
+    cur.execute(f"DELETE FROM media WHERE key={ph()}", (key,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
 # ── Public routes ─────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -145,6 +217,7 @@ def api_config():
         cfg["verdicts"] = json.loads(cfg["verdicts"])
     except Exception:
         cfg["verdicts"] = json.loads(DEFAULT_CONFIG["verdicts"])
+    cfg["has_overlay_video"] = media_exists("overlay_video")
     return jsonify(cfg)
 
 @app.route("/api/submit", methods=["POST"])
@@ -186,6 +259,14 @@ def leaderboard():
     cur.close()
     conn.close()
     return jsonify([{"username": r[0], "best_ms": r[1]} for r in rows])
+
+@app.route("/api/media/overlay_video")
+def serve_overlay_video():
+    from flask import Response
+    item = media_get("overlay_video")
+    if not item or not item["data"]:
+        return "", 404
+    return Response(item["data"], mimetype=item["content_type"] or "video/mp4")
 
 # ── Admin routes ──────────────────────────────────────────────────────────────
 
@@ -276,6 +357,52 @@ def admin_set_config():
                 value = json.dumps(value, ensure_ascii=False)
             set_config(key, str(value))
     return jsonify({"ok": True})
+
+@app.route("/api/admin/video", methods=["POST"])
+def admin_upload_video():
+    if not admin_logged_in():
+        return jsonify({"error": "No autorizado"}), 401
+    f = request.files.get("video")
+    if not f or not f.filename:
+        return jsonify({"error": "No se ha recibido ningún archivo"}), 400
+
+    allowed_ext = (".mp4", ".mov", ".webm")
+    fname = f.filename.lower()
+    if not fname.endswith(allowed_ext):
+        return jsonify({"error": "Formato no soportado (usa mp4, mov o webm)"}), 400
+
+    data = f.read()
+    content_type = f.mimetype or "video/mp4"
+    if fname.endswith(".mov") and content_type == "application/octet-stream":
+        content_type = "video/quicktime"
+
+    media_set("overlay_video", f.filename, content_type, data)
+    return jsonify({"ok": True, "filename": f.filename, "size": len(data)})
+
+@app.route("/api/admin/video", methods=["DELETE"])
+def admin_delete_video():
+    if not admin_logged_in():
+        return jsonify({"error": "No autorizado"}), 401
+    media_delete("overlay_video")
+    return jsonify({"ok": True})
+
+@app.route("/api/admin/video", methods=["GET"])
+def admin_video_info():
+    if not admin_logged_in():
+        return jsonify({"error": "No autorizado"}), 401
+    item = media_get("overlay_video")
+    if not item:
+        return jsonify({"exists": False})
+    return jsonify({
+        "exists": True,
+        "filename": item["filename"],
+        "content_type": item["content_type"],
+        "size": len(item["data"]) if item["data"] else 0,
+    })
+
+@app.errorhandler(413)
+def too_large(e):
+    return jsonify({"error": "El archivo es demasiado grande (máx. 20MB)"}), 413
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 
